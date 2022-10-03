@@ -63,7 +63,7 @@ function think()
 	gpanel.playerInfo.session:SetTextColor( insideTextColor )
 	gpanel.playerInfo.nick:SetTextColor( insideTextColor )
 end
-timer.Create( "UTimeThink", 0.6, 0, think )
+timer.Create( "UTimeThink", 0.5, 0, think )
 
 local texGradient = surface.GetTextureID( "gui/gradient" )
 
@@ -154,6 +154,10 @@ end
 --	 Name: Think
 -----------------------------------------------------------
 local locktime = 0
+local timedTrace = {}
+timedTrace.Timer = 0
+timedTrace.MaxGap = 0.5
+
 function PANEL:Think()
 	if self.Size == self.Small then
 		self.playerInfo:SetVisible( false )
@@ -161,24 +165,30 @@ function PANEL:Think()
 		self.playerInfo:SetVisible( true )
 	end
 
-	if not IsValid( LocalPlayer() ) then return end
+	timedTrace.Timer = timedTrace.Timer + RealFrameTime()
 
-	local tr = util.GetPlayerTrace( LocalPlayer(), LocalPlayer():GetAimVector() )
-	local trace = util.TraceLine( tr )
-	local ply = trace.Entity
-	if ply and ply:IsValid() and ply:IsPlayer() and self:ShouldRevealPlayer(ply) then
-		self.TargetSize = self.Large
-		self.playerInfo:SetPlayer( trace.Entity )
-		locktime = CurTime()
-	end
+	if timedTrace.Timer >= timedTrace.MaxGap then
+		if not IsValid( LocalPlayer() ) then return end
 
-	if locktime + 2 < CurTime() then
-		self.TargetSize = self.Small
+		local tr = util.GetPlayerTrace( LocalPlayer(), LocalPlayer():GetAimVector() )
+		local trace = util.TraceLine( tr )
+		local ply = trace.Entity
+		if ply and ply:IsValid() and ply:IsPlayer() and self:ShouldRevealPlayer(ply) then
+			self.TargetSize = self.Large
+			self.playerInfo:SetPlayer( ply )
+			locktime = CurTime()
+		end
+
+		if locktime + 2 < CurTime() then
+			self.TargetSize = self.Small
+		end
+
+		timedTrace.Timer = math.fmod(timedTrace.Timer,timedTrace.MaxGap)
 	end
 
 	if self.Size ~= self.TargetSize then
 		self.Size = math.Approach( self.Size, self.TargetSize, (math.abs( self.Size - self.TargetSize ) + 1) * 8 * FrameTime() )
-		self:PerformLayout()
+		self:InvalidateLayout()
 	end
 
 	self.total:SetText( timeToStr( LocalPlayer():GetUTimeTotalTime() ) )
